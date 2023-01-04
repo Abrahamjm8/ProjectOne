@@ -1,0 +1,74 @@
+# A Docker Compose must always start with the version tag.
+version: '3'
+
+# Docker Compose works with services.
+# 1 service = 1 container.
+# For example, a server, a client, a database...
+# We use the keyword 'services' to start to create services.
+services:
+
+  # the name of this serivce(container) is called "app".
+  app:
+    # the image tells docker what image we are building
+    image: abraham126/javanotes:latest
+    # the build section provides docker with the details needed to build the specified image
+      # context tells docker where to copy any necessary files from: . indicates current directory
+    # container_name sets the name of the container. simulates adding the --name flag to docker run
+    # ports maps the host port (left side) to the container port (right side)
+    container_name: planetarium
+    ports:
+      - 8080:8080 
+      - 5432:5432 #idk if i need this 
+    # depends_on is useful if you need another container to be created first
+    # depends_on:
+    #   - dependency
+    # you can set environment variables in the container
+    environment:
+      - VARIABLE=VALUE
+    # you can map files in a container directory (right side) to a directory outside the container (left side)
+    volumes:
+      - ./logs/:/logs/
+  
+  loki:
+    image: grafana/loki:latest
+    container_name: logging-loki
+    ports:
+      - 3100:3100
+
+  promtail: #get logs from machine to loki
+    image: grafana/promtail:latest
+    container_name: logging-promtail
+    volumes:
+      - ./configs/promtail-config.yml:/etc/promtail/promtail-config.yml # configuration I made:config saved in container
+      - ./logs/staticLogs.log:/var/log/staticLogs.log # log we want to save:log in promtail
+    command: "--config.file=/etc/promtail/config.yml"
+
+  grafana: 
+    image: grafana/grafana:latest # default username/password:admin/admin
+    container_name: logging-grafana
+    #volumes:
+     # - grafana-data:/var/lib/grafana
+    # persisting grafana settings
+    ports:
+      - 3000:3000
+    depends_on:
+      - loki
+
+  prometheus:
+    image: prom/prometheus:latest # think of this as your database for your metrics over time
+    ports:
+      - 9090:9090
+    volumes:
+      - ./configs/prometheus-config.yml:/etc/prometheus/prometheus-config.yml
+      - ./configs/prometheus-rules.yml:/etc/prometheus/prometheus-rules.yml
+    container_name: logging-prometheus
+    command: "--config.file=/etc/prometheus/prometheus-config.yml" # we need to tell Prometheus what to target
+
+  # this is the second container for our deployment
+  # dependency:
+
+  #   image: 'anotherImage'
+  #   container_name: requiredContent
+  #   ports:
+  #     - 1234:1234
+
